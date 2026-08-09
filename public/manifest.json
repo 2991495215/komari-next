@@ -1,6 +1,6 @@
 {
-  "name": "Komari Monitor",
-  "short_name": "Komari Monitor",
+  "name": "ZINC Monitor",
+  "short_name": "ZINC Monitor",
   "description": "A simple server monitor tool",
   "start_url": "/",
   "display": "standalone",

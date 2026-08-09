@@ -83,7 +83,7 @@ export function formatTrafficPercentage(value: number): string {
   return "<0.01%";
 }
 
-type QualityTone = "good" | "warn" | "bad";
+type QualityTone = "darkGreen" | "green" | "lime" | "yellow" | "orange" | "red";
 
 const PING_HISTORY_PLACEHOLDER_POINTS: PingHistoryPoint[] = Array.from(
   { length: 28 },
@@ -91,33 +91,48 @@ const PING_HISTORY_PLACEHOLDER_POINTS: PingHistoryPoint[] = Array.from(
     time: `placeholder-${index}`,
     latency: null,
     loss: null,
+    timeout: false,
   })
 );
 
 const qualityToneStyles: {
   [tone in QualityTone]: { bar: string };
 } = {
-  good: {
-    bar: "bg-emerald-500",
+  darkGreen: {
+    bar: "bg-[#15803d]",
   },
-  warn: {
-    bar: "bg-amber-500",
+  green: {
+    bar: "bg-[#22c55e]",
   },
-  bad: {
-    bar: "bg-rose-500",
+  lime: {
+    bar: "bg-[#a3e635]",
+  },
+  yellow: {
+    bar: "bg-[#facc15]",
+  },
+  orange: {
+    bar: "bg-[#f97316]",
+  },
+  red: {
+    bar: "bg-[#dc2626]",
   },
 };
 
 function getLatencyTone(latency: number): QualityTone {
-  if (latency <= 80) return "good";
-  if (latency <= 180) return "warn";
-  return "bad";
+  if (latency <= 50) return "darkGreen";
+  if (latency <= 100) return "green";
+  if (latency <= 200) return "lime";
+  if (latency <= 250) return "yellow";
+  return "orange";
 }
 
 function getLossTone(loss: number): QualityTone {
-  if (loss <= 1) return "good";
-  if (loss <= 5) return "warn";
-  return "bad";
+  if (loss <= 0) return "darkGreen";
+  if (loss <= 5) return "green";
+  if (loss <= 15) return "lime";
+  if (loss <= 30) return "yellow";
+  if (loss < 50) return "orange";
+  return "red";
 }
 
 function formatHistoryTime(time: string) {
@@ -154,11 +169,15 @@ function PingHistoryStrip({
         <span className="shrink-0 font-mono font-semibold text-foreground/80">{value}</span>
       </div>
       <div className="flex h-5 gap-0.5">
-        {points.filter(p => p.latency !== null || !isLoaded).map((point, index) => {
+        {points.filter((point) =>
+          !isLoaded || (metric === "latency" ? point.latency !== null || point.timeout : point.loss !== null)
+        ).map((point, index) => {
           const metricValue = point[metric];
           const tone =
-            metricValue === null
-              ? null
+            metric === "latency" && point.timeout
+              ? "red"
+              : metricValue === null
+                ? null
               : metric === "latency"
                 ? getLatencyTone(metricValue)
                 : getLossTone(metricValue);
@@ -166,8 +185,10 @@ function PingHistoryStrip({
             ? qualityToneStyles[tone].bar
             : "bg-muted-foreground/18";
           const titleValue =
-            metricValue === null
-              ? "No data"
+            metric === "latency" && point.timeout
+              ? "Timeout"
+              : metricValue === null
+                ? "No data"
               : metric === "latency"
                 ? `${Math.round(metricValue)} ms`
                 : `${metricValue.toFixed(1)}%`;

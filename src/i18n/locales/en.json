@@ -324,7 +324,7 @@
     "title": "Remote Exec"
   },
   "go_to_home": "Go to home",
-  "home_title": "Komari Monitor",
+  "home_title": "ZINC Monitor",
   "just_now": "Just now",
   "loadAlert": {
     "metric": "Metric",
@@ -435,7 +435,7 @@
     "can_install": "Can Install",
     "install": "Install",
     "install_prompt_desc": "Add to home screen for quick access",
-    "install_prompt_title": "Install Komari Monitor",
+    "install_prompt_title": "Install ZINC Monitor",
     "install_status": "Install Status",
     "installed": "Installed",
     "installed_hint": "The app is installed on your device, you can access it quickly from the home screen.",

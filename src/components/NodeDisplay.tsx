@@ -21,6 +21,23 @@ interface NodeDisplayProps {
   liveData: LiveData;
 }
 
+const PRIORITY_GROUPS = ["Server", "Node", "🪜"];
+
+function getNodeGroups(node: NodeBasicInfo): string[] {
+  return Array.from(
+    new Set(
+      (node.group || "")
+        .split(/[;?；]/)
+        .map((group) => group.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function nodeHasGroup(node: NodeBasicInfo, group: string): boolean {
+  return getNodeGroups(node).includes(group);
+}
+
 const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
   const [t] = useTranslation();
   const [viewMode, setViewMode] = useNodeViewMode();
@@ -36,11 +53,14 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
   const groups = useMemo(() => {
     const groupSet = new Set<string>();
     nodes.forEach((node) => {
-      if (node.group && node.group.trim()) {
-        groupSet.add(node.group);
-      }
+      getNodeGroups(node).forEach((group) => groupSet.add(group));
     });
-    return Array.from(groupSet).sort();
+    return Array.from(groupSet).sort((left, right) => {
+      const leftPriority = PRIORITY_GROUPS.indexOf(left);
+      const rightPriority = PRIORITY_GROUPS.indexOf(right);
+      return (leftPriority < 0 ? Number.MAX_SAFE_INTEGER : leftPriority)
+        - (rightPriority < 0 ? Number.MAX_SAFE_INTEGER : rightPriority);
+    });
   }, [nodes]);
 
   // 判断是否显示分组选择器
@@ -71,7 +91,7 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
 
     // 先按分组过滤
     if (selectedGroup !== "all") {
-      result = result.filter((node) => node.group === selectedGroup);
+      result = result.filter((node) => nodeHasGroup(node, selectedGroup));
     }
 
     // 再按搜索条件过滤
@@ -193,7 +213,7 @@ const NodeDisplay: React.FC<NodeDisplayProps> = ({ nodes, liveData }) => {
                 total:
                   selectedGroup === "all"
                     ? nodes.length
-                    : nodes.filter((n) => n.group === selectedGroup).length,
+                    : nodes.filter((node) => nodeHasGroup(node, selectedGroup)).length,
                 defaultValue: `Found ${filteredNodes.length} nodes`,
               })}
             </span>

@@ -1,10 +1,10 @@
 {
-    "name": "Komari Next",
+    "name": "ZINC Next",
     "short": "next",
-    "description": "NextJS theme for Komari Monitor",
+    "description": "ZINC server monitor theme",
     "version": "1.4.19",
-    "author": "tonyliuzj",
-    "url": "https://github.com/tonyliuzj/komari-next",
+    "author": "2991495215",
+    "url": "https://github.com/2991495215/komari-next",
     "preview": "preview.png",
     "configuration": {
         "name": "Theme Settings",

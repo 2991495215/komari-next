@@ -6,6 +6,7 @@ export interface PingHistoryPoint {
   time: string;
   latency: number | null;
   loss: number | null;
+  timeout: boolean;
 }
 
 export interface PingStats {
@@ -61,16 +62,16 @@ function buildPingHistory(records: PingRecord[]): PingHistoryPoint[] {
     );
     const validLatencyRecords = bucketRecords.filter((record) => record.value >= 0);
     const lostRecords = bucketRecords.length - validLatencyRecords.length;
-    const latency =
-      validLatencyRecords.length > 0
-        ? validLatencyRecords.reduce((sum, record) => sum + record.value, 0) / validLatencyRecords.length
-        : null;
+    const latency = validLatencyRecords.length > 0
+      ? Math.min(...validLatencyRecords.map((record) => record.value))
+      : null;
     const loss = bucketRecords.length > 0 ? (lostRecords / bucketRecords.length) * 100 : null;
 
     return {
       time: new Date(startTime).toISOString(),
       latency,
       loss,
+      timeout: bucketRecords.length > 0 && validLatencyRecords.length === 0,
     };
   });
 }
@@ -111,30 +112,50 @@ export function usePingStats(uuid: string, hours: number = 24, enabled: boolean 
           return;
         }
 
-        const history = buildPingHistory(records);
-        const latencyValues = tasks
-          .map((task) => task.avg ?? task.latest ?? task.value ?? task.p50)
-          .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-        const avgLatency = latencyValues.length > 0
-          ? latencyValues.reduce((sum, value) => sum + value, 0) / latencyValues.length
-          : 0;
+        const taskIds = new Set(tasks.map((task) => task.id));
+        const relevantRecords = records.filter((record) => taskIds.has(record.task_id));
+        const candidates = tasks
+          .map((task) => {
+            const taskRecords = relevantRecords
+              .filter((record) => record.task_id === task.id)
+              .map((record) => ({
+                ...record,
+                timestamp: new Date(record.time).getTime(),
+              }))
+              .filter((record) => Number.isFinite(record.timestamp))
+              .sort((left, right) => left.timestamp - right.timestamp);
+            const latestRecord = taskRecords.at(-1);
 
-        // Calculate average loss from tasks
-        const totalLoss = tasks.reduce((sum, task) => sum + (task.loss || 0), 0);
-        const avgLoss = tasks.length > 0 ? totalLoss / tasks.length : 0;
+            if (!latestRecord || latestRecord.value < 0) {
+              return null;
+            }
 
-        // Calculate volatility (p99/p50 ratio average)
-        const volatilityValues = tasks
-          .filter(task => task.p99_p50_ratio !== undefined && task.p99_p50_ratio > 0)
-          .map(task => task.p99_p50_ratio!);
+            const lostRecords = taskRecords.filter((record) => record.value < 0).length;
+            return {
+              task,
+              records: taskRecords,
+              latency: latestRecord.value,
+              loss: taskRecords.length > 0 ? (lostRecords / taskRecords.length) * 100 : 100,
+            };
+          })
+          .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
+          .sort((left, right) => left.latency - right.latency || left.loss - right.loss);
+        const selected = candidates[0];
 
-        const avgVolatility = volatilityValues.length > 0
-          ? volatilityValues.reduce((sum, val) => sum + val, 0) / volatilityValues.length
-          : 0;
+        if (!selected) {
+          setStats(createEmptyStats({ isLoaded: true }));
+          return;
+        }
+
+        const history = buildPingHistory(selected.records);
+        const avgVolatility =
+          typeof selected.task.p99_p50_ratio === 'number' && selected.task.p99_p50_ratio > 0
+            ? selected.task.p99_p50_ratio
+            : 0;
 
         setStats({
-          avgLatency,
-          avgLoss,
+          avgLatency: selected.latency,
+          avgLoss: selected.loss,
           avgVolatility,
           history,
           hasData: true,
