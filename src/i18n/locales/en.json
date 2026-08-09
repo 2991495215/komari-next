@@ -376,6 +376,8 @@
     "offline": "Offline",
     "online": "Online",
     "pingStats": "Ping Stats (24h)",
+    "minimumLatency": "Minimum latency",
+    "averageLatency": "Average latency",
     "os": "OS",
     "ping": "Ping",
     "price": "Price",

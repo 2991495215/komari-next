@@ -67,8 +67,10 @@ const MiniPingChart = ({
         const result = await fetchPingRecords(call, uuid, hours, { forceRefresh });
         if (!active) return;
         hasReceivedResponse = true;
-        setRemoteData(result.records);
-        setTasks(result?.tasks || []);
+        const nextTasks = result?.tasks || [];
+        const taskIds = new Set(nextTasks.map((task) => task.id));
+        setRemoteData((result.records || []).filter((record) => taskIds.has(record.task_id)));
+        setTasks(nextTasks);
         setError(null);
         setLoading(false);
       } catch (err: any) {
@@ -283,13 +285,17 @@ const MiniPingChart = ({
               <ChartTooltip
                 cursor={false}
                 content={<CustomTooltip />}
-                allowEscapeViewBox={{ x: true, y: true }}
-                wrapperStyle={{ pointerEvents: "auto", zIndex: 20 }}
+                allowEscapeViewBox={{ x: false, y: true }}
+                wrapperStyle={{
+                  pointerEvents: "auto",
+                  zIndex: 20,
+                  maxWidth: "min(18rem, calc(100vw - 3rem))",
+                }}
               />
               <ChartLegend
                 onClick={handleLegendClick}
                 content={
-                  <ChartLegendContent className="flex-wrap justify-start gap-x-3 gap-y-2 text-xs" />
+                  <ChartLegendContent className="flex max-w-full flex-wrap justify-start gap-x-3 gap-y-2 text-xs" />
                 }
               />
               {(() => {

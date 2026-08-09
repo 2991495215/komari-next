@@ -14,6 +14,8 @@ export interface PingStats {
   avgLoss: number;
   avgVolatility: number;
   history: PingHistoryPoint[];
+  latencyHistory: PingHistoryPoint[];
+  averageLatencyHistory: PingHistoryPoint[];
   hasData: boolean;
   isLoaded: boolean;
   isLoading: boolean;
@@ -30,13 +32,18 @@ function createEmptyStats({
     avgLoss: 0,
     avgVolatility: 0,
     history: [],
+    latencyHistory: [],
+    averageLatencyHistory: [],
     hasData: false,
     isLoaded,
     isLoading,
   };
 }
 
-function buildPingHistory(records: PingRecord[]): PingHistoryPoint[] {
+function buildPingHistory(
+  records: PingRecord[],
+  aggregation: "minimum" | "average",
+): PingHistoryPoint[] {
   const sortedRecords = records
     .map((record) => ({
       ...record,
@@ -61,16 +68,17 @@ function buildPingHistory(records: PingRecord[]): PingHistoryPoint[] {
       (record) => record.timestamp >= startTime && record.timestamp < endTime,
     );
     const validLatencyRecords = bucketRecords.filter((record) => record.value >= 0);
-    const lostRecords = bucketRecords.length - validLatencyRecords.length;
     const latency = validLatencyRecords.length > 0
-      ? Math.min(...validLatencyRecords.map((record) => record.value))
+      ? aggregation === "minimum"
+        ? Math.min(...validLatencyRecords.map((record) => record.value))
+        : validLatencyRecords.reduce((sum, record) => sum + record.value, 0) /
+          validLatencyRecords.length
       : null;
-    const loss = bucketRecords.length > 0 ? (lostRecords / bucketRecords.length) * 100 : null;
 
     return {
       time: new Date(startTime).toISOString(),
       latency,
-      loss,
+      loss: null,
       timeout: bucketRecords.length > 0 && validLatencyRecords.length === 0,
     };
   });
@@ -114,6 +122,16 @@ export function usePingStats(uuid: string, hours: number = 24, enabled: boolean 
 
         const taskIds = new Set(tasks.map((task) => task.id));
         const relevantRecords = records.filter((record) => taskIds.has(record.task_id));
+        if (relevantRecords.length === 0) {
+          setStats(createEmptyStats({ isLoaded: true }));
+          return;
+        }
+
+        const successfulRecords = relevantRecords.filter((record) => record.value >= 0);
+        const averageLatency = successfulRecords.length > 0
+          ? successfulRecords.reduce((sum, record) => sum + record.value, 0) /
+            successfulRecords.length
+          : 0;
         const candidates = tasks
           .map((task) => {
             const taskRecords = relevantRecords
@@ -124,40 +142,42 @@ export function usePingStats(uuid: string, hours: number = 24, enabled: boolean 
               }))
               .filter((record) => Number.isFinite(record.timestamp))
               .sort((left, right) => left.timestamp - right.timestamp);
-            const latestRecord = taskRecords.at(-1);
-
-            if (!latestRecord || latestRecord.value < 0) {
-              return null;
-            }
-
-            const lostRecords = taskRecords.filter((record) => record.value < 0).length;
+            const validRecords = taskRecords.filter((record) => record.value >= 0);
+            const lostRecords = taskRecords.length - validRecords.length;
             return {
               task,
               records: taskRecords,
-              latency: latestRecord.value,
+              successCount: validRecords.length,
+              minLatency: validRecords.length > 0
+                ? Math.min(...validRecords.map((record) => record.value))
+                : Number.POSITIVE_INFINITY,
               loss: taskRecords.length > 0 ? (lostRecords / taskRecords.length) * 100 : 100,
             };
           })
-          .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
-          .sort((left, right) => left.latency - right.latency || left.loss - right.loss);
-        const selected = candidates[0];
+          .filter((candidate) => candidate.records.length > 0)
+          .sort((left, right) => left.minLatency - right.minLatency || left.loss - right.loss);
+        const selected = candidates.find((candidate) => candidate.successCount > 0) || candidates[0];
 
         if (!selected) {
           setStats(createEmptyStats({ isLoaded: true }));
           return;
         }
 
-        const history = buildPingHistory(selected.records);
+        const minimumLatencyHistory = buildPingHistory(selected.records, "minimum");
+        const averageLatencyHistory = buildPingHistory(relevantRecords, "average");
         const avgVolatility =
           typeof selected.task.p99_p50_ratio === 'number' && selected.task.p99_p50_ratio > 0
             ? selected.task.p99_p50_ratio
             : 0;
 
         setStats({
-          avgLatency: selected.latency,
-          avgLoss: selected.loss,
+          avgLatency: Number.isFinite(selected.minLatency) ? selected.minLatency : 0,
+          // Legacy ZINC UI uses this field for the all-task average latency.
+          avgLoss: Number.isFinite(averageLatency) ? averageLatency : 0,
           avgVolatility,
-          history,
+          history: minimumLatencyHistory,
+          latencyHistory: minimumLatencyHistory,
+          averageLatencyHistory,
           hasData: true,
           isLoaded: true,
           isLoading: false,

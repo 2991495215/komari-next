@@ -152,7 +152,9 @@ export const NodeListProvider: React.FC<{ children: React.ReactNode }> = ({
           updated_at: n.updated_at ?? "",
           ipv4: n.ipv4,
           ipv6: n.ipv6,
-        }));
+        })).sort((left, right) =>
+          (right.weight ?? 0) - (left.weight ?? 0) || left.name.localeCompare(right.name)
+        );
         setNodeList(list);
       })
       .catch((err: any) => {

@@ -113,7 +113,7 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData }) => {
       if (aOnline !== bOnline) {
         return aOnline ? -1 : 1;
       }
-      return a.weight - b.weight;
+      return (a.weight ?? 0) - (b.weight ?? 0) || a.name.localeCompare(b.name);
     }
 
     let comparison = 0;
@@ -457,8 +457,20 @@ const NodeTable: React.FC<NodeTableProps> = ({ nodes, liveData }) => {
                           </div>
                         </div>
                       ) : (
-                        <div className="font-mono text-xs tabular-nums text-muted-foreground whitespace-nowrap">
-                          {formatBytes(nodeData.network.totalUp + nodeData.network.totalDown)}
+                        <div className="mx-auto w-full max-w-[184px] space-y-1">
+                          <div className="flex items-center justify-between gap-2 text-[10px] leading-none text-muted-foreground">
+                            <span className="shrink-0">{trafficLimitType.toUpperCase()} Limit</span>
+                            <span className="shrink-0 font-mono tabular-nums">∞</span>
+                          </div>
+                          <div className="h-1 w-full overflow-hidden rounded-full bg-secondary">
+                            <div
+                              className="h-full rounded-full bg-primary/70 transition-transform duration-500 origin-left"
+                              style={{ transform: "scaleX(0)" }}
+                            />
+                          </div>
+                          <div className="truncate text-[10px] leading-none text-muted-foreground">
+                            {formatBytes(trafficUsed)} / ∞
+                          </div>
                         </div>
                       )}
                     </div>

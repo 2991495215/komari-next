@@ -10,6 +10,7 @@ import { usePublicInfo } from "@/contexts/PublicInfoContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useTranslation } from "react-i18next";
 import { dispatchOpenRemainingValueCalculatorEvent } from "@/lib/remainingValueEvents";
+import SpaLink from "./SpaLink";
 
 const NavBar = () => {
   const { publicInfo } = usePublicInfo();
@@ -21,20 +22,20 @@ const NavBar = () => {
       <div className="container mx-auto flex h-16 md:h-20 items-center justify-between px-4">
         {/* Logo and Title */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-3">
+          <SpaLink href="/" className="flex shrink-0 items-center gap-2 md:gap-3">
             <img
               src="/assets/logo.png"
               alt=""
-              className="h-9 w-9 rounded-lg bg-white object-contain p-0.5 shadow-md shadow-primary/20"
+              className="h-8 w-8 rounded-lg bg-white object-contain p-0.5 shadow-md shadow-primary/20 md:h-9 md:w-9"
             />
-            <span className="text-xl md:text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            <span className="whitespace-nowrap bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-lg font-bold tracking-tight text-transparent md:text-2xl">
               {publicInfo?.sitename}
             </span>
-          </div>
+          </SpaLink>
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           <DarkModeToggle />
           <ThemeSwitcher />
           {guestDisplay.showPrice && guestDisplay.showExpiredAt && (

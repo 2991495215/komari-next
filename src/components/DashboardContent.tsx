@@ -168,7 +168,7 @@ export default function DashboardContent() {
       title: t("current_online"),
       icon: <Activity className="h-4 w-4 text-muted-foreground" />,
       getValue: () =>
-        `${live_data?.data?.online.length ?? 0} / ${nodeList?.length ?? 0}`,
+        `${nodeList?.filter((node) => live_data?.data?.online?.includes(node.uuid)).length ?? 0} / ${nodeList?.length ?? 0}`,
       visible: statusCardsVisibility.currentOnline,
     },
     {

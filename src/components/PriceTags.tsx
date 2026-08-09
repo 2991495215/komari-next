@@ -273,7 +273,7 @@ const CustomTags = ({
             color={badgeColor}
             variant="outline"
             className={cn(
-              "text-sm",
+              "text-sm text-white",
               compact &&
                 "h-5 min-w-0 max-w-[4.75rem] shrink px-1.5 py-0 text-[10px] leading-none"
             )}
@@ -281,7 +281,7 @@ const CustomTags = ({
           >
             <label
               className={cn(
-                "text-xs",
+                "text-xs text-white",
                 compact && "block min-w-0 truncate text-[10px] leading-none"
               )}
             >
@@ -293,10 +293,10 @@ const CustomTags = ({
       {hiddenCount > 0 && (
         <Badge
           variant="outline"
-          className="h-5 shrink-0 border-muted-foreground/25 bg-muted/50 px-1.5 py-0 text-[10px] leading-none text-muted-foreground"
+          className="h-5 shrink-0 border-muted-foreground/25 bg-muted/50 px-1.5 py-0 text-[10px] leading-none text-white"
           title={hiddenTitle}
         >
-          <label className="text-[10px] leading-none">+{hiddenCount}</label>
+          <label className="text-[10px] leading-none text-white">+{hiddenCount}</label>
         </Badge>
       )}
     </>

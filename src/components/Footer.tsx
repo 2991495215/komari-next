@@ -37,9 +37,29 @@ const Footer = () => {
 
   return (
     <footer className="border-t bg-gradient-to-b from-card/30 to-card/50 backdrop-blur-sm">
-      <div className="container mx-auto px-4 py-5">
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex flex-col gap-1.5 text-xs text-muted-foreground text-center">
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:items-start">
+          <div className="flex flex-col items-center gap-3 md:items-start">
+            <div className="flex items-center gap-2">
+              <img
+                src="/assets/logo.png"
+                alt=""
+                className="h-8 w-8 rounded-lg bg-white object-contain p-0.5 shadow-lg shadow-primary/20"
+              />
+              <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-lg font-bold text-transparent">
+                ZINC VPS
+              </span>
+            </div>
+            <p className="max-w-xs text-center text-sm text-muted-foreground md:text-left">
+              Real-time VPS status and uptime overview
+            </p>
+          </div>
+
+          <div aria-hidden="true" className="hidden md:block" />
+
+          <div className="flex flex-col items-center gap-3 md:items-end">
+            <h4 className="text-sm font-semibold text-foreground">Version Info</h4>
+            <div className="flex flex-col gap-1.5 text-center text-xs text-muted-foreground md:text-right">
             {buildTime && (
               <div className="flex items-center gap-2">
                 <span className="font-medium text-foreground">Build:</span>
@@ -65,6 +85,13 @@ const Footer = () => {
               </div>
             )}
           </div>
+          </div>
+        </div>
+
+        <div className="mt-8 border-t border-border/50 pt-6">
+          <p className="text-center text-xs text-muted-foreground">
+            <span className="font-medium">ZINC VPS</span> - VPS status overview
+          </p>
         </div>
       </div>
     </footer>

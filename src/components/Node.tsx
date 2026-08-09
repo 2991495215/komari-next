@@ -13,7 +13,9 @@ import type { LiveData, Record } from "../types/LiveData";
 import { getOSImage, getOSName } from "@/utils";
 import { formatBytes } from "@/utils/unitHelper";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useRPC2Call } from "@/contexts/RPC2Context";
 import { type PingHistoryPoint, type PingStats, usePingStats } from "@/hooks/usePingStats";
+import { resolveZincIpCapabilities } from "@/config/zincNodeOverrides";
 
 import Flag from "./Flag";
 import PriceTags from "./PriceTags";
@@ -95,44 +97,21 @@ const PING_HISTORY_PLACEHOLDER_POINTS: PingHistoryPoint[] = Array.from(
   })
 );
 
-const qualityToneStyles: {
-  [tone in QualityTone]: { bar: string };
-} = {
-  darkGreen: {
-    bar: "bg-[#15803d]",
-  },
-  green: {
-    bar: "bg-[#22c55e]",
-  },
-  lime: {
-    bar: "bg-[#a3e635]",
-  },
-  yellow: {
-    bar: "bg-[#facc15]",
-  },
-  orange: {
-    bar: "bg-[#f97316]",
-  },
-  red: {
-    bar: "bg-[#dc2626]",
-  },
+const qualityToneStyles: { [tone in QualityTone]: string } = {
+  darkGreen: "#16a34a",
+  green: "#22c55e",
+  lime: "#84cc16",
+  yellow: "#facc15",
+  orange: "#f97316",
+  red: "#dc2626",
 };
 
 function getLatencyTone(latency: number): QualityTone {
   if (latency <= 50) return "darkGreen";
-  if (latency <= 100) return "green";
+  if (latency <= 150) return "green";
   if (latency <= 200) return "lime";
   if (latency <= 250) return "yellow";
   return "orange";
-}
-
-function getLossTone(loss: number): QualityTone {
-  if (loss <= 0) return "darkGreen";
-  if (loss <= 5) return "green";
-  if (loss <= 15) return "lime";
-  if (loss <= 30) return "yellow";
-  if (loss < 50) return "orange";
-  return "red";
 }
 
 function formatHistoryTime(time: string) {
@@ -153,13 +132,11 @@ function PingHistoryStrip({
   label,
   value,
   points,
-  metric,
   isLoaded,
 }: {
   label: string;
   value: string;
   points: PingHistoryPoint[];
-  metric: "latency" | "loss";
   isLoaded: boolean;
 }) {
   return (
@@ -169,34 +146,27 @@ function PingHistoryStrip({
         <span className="shrink-0 font-mono font-semibold text-foreground/80">{value}</span>
       </div>
       <div className="flex h-5 gap-0.5">
-        {points.filter((point) =>
-          !isLoaded || (metric === "latency" ? point.latency !== null || point.timeout : point.loss !== null)
-        ).map((point, index) => {
-          const metricValue = point[metric];
+        {points.filter((point) => !isLoaded || point.latency !== null || point.timeout).map((point, index) => {
+          const metricValue = point.latency;
           const tone =
-            metric === "latency" && point.timeout
+            point.timeout
               ? "red"
               : metricValue === null
                 ? null
-              : metric === "latency"
-                ? getLatencyTone(metricValue)
-                : getLossTone(metricValue);
-          const blockClassName = tone
-            ? qualityToneStyles[tone].bar
-            : "bg-muted-foreground/18";
+                : getLatencyTone(metricValue);
+          const blockColor = tone ? qualityToneStyles[tone] : undefined;
           const titleValue =
-            metric === "latency" && point.timeout
+            point.timeout
               ? "Timeout"
               : metricValue === null
                 ? "No data"
-              : metric === "latency"
-                ? `${Math.round(metricValue)} ms`
-                : `${metricValue.toFixed(1)}%`;
+                : `${Math.round(metricValue)} ms`;
 
           return (
             <span
               key={`${point.time}-${index}`}
-              className={`flex-1 min-w-[2px] rounded-[2px] ${blockClassName}`}
+              className={`flex-1 min-w-[2px] rounded-[2px] ${blockColor ? "" : "bg-muted-foreground/18"}`}
+              style={blockColor ? { backgroundColor: blockColor } : undefined}
               title={`${formatHistoryTime(point.time)} ${titleValue}`}
             />
           );
@@ -207,8 +177,11 @@ function PingHistoryStrip({
 }
 
 function PingQualityBars({ pingStats, t }: { pingStats: PingStats; t: TFunction }) {
-  const historyPoints = pingStats.hasData && pingStats.history.length > 0
-    ? pingStats.history
+  const minimumLatencyHistory = pingStats.hasData && pingStats.latencyHistory.length > 0
+    ? pingStats.latencyHistory
+    : PING_HISTORY_PLACEHOLDER_POINTS;
+  const averageLatencyHistory = pingStats.hasData && pingStats.averageLatencyHistory.length > 0
+    ? pingStats.averageLatencyHistory
     : PING_HISTORY_PLACEHOLDER_POINTS;
   const statusText = pingStats.hasData
     ? `${pingStats.avgVolatility.toFixed(1)} ${t("chart.volatility")}`
@@ -218,9 +191,9 @@ function PingQualityBars({ pingStats, t }: { pingStats: PingStats; t: TFunction 
   const latencyValue = pingStats.hasData
     ? `${Math.round(pingStats.avgLatency)} ms`
     : "-- ms";
-  const lossValue = pingStats.hasData
-    ? `${pingStats.avgLoss.toFixed(1)}%`
-    : "--%";
+  const averageLatencyValue = pingStats.hasData && Number.isFinite(pingStats.avgLoss)
+    ? `${Math.round(pingStats.avgLoss)} ms`
+    : "-- ms";
 
   return (
     <div className="space-y-2">
@@ -233,17 +206,15 @@ function PingQualityBars({ pingStats, t }: { pingStats: PingStats; t: TFunction 
       {(!pingStats.isLoaded || pingStats.hasData) && (
         <div className="grid grid-cols-2 gap-2">
           <PingHistoryStrip
-            label={t("nodeCard.latency", { defaultValue: "Latency" })}
+            label={t("nodeCard.minimumLatency", { defaultValue: "Minimum latency" })}
             value={latencyValue}
-            points={historyPoints}
-            metric="latency"
+            points={minimumLatencyHistory}
             isLoaded={pingStats.isLoaded}
           />
           <PingHistoryStrip
-            label={t("chart.lossRate", { defaultValue: "Loss" })}
-            value={lossValue}
-            points={historyPoints}
-            metric="loss"
+            label={t("nodeCard.averageLatency", { defaultValue: "Average latency" })}
+            value={averageLatencyValue}
+            points={averageLatencyHistory}
             isLoaded={pingStats.isLoaded}
           />
         </div>
@@ -264,9 +235,50 @@ interface NodeProps {
 const Node = ({ basic, live, online, pingStatsEnabled = false }: NodeProps) => {
   const [t] = useTranslation();
   const { guestDisplay, themeConfig } = useTheme();
+  const { call } = useRPC2Call();
   const pingStats = usePingStats(basic.uuid, 24, pingStatsEnabled);
   const showPrice = guestDisplay.showPrice;
   const showExpiredAt = guestDisplay.showExpiredAt;
+
+  const [offlineTraffic, setOfflineTraffic] = React.useState<{ totalUp: number; totalDown: number } | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    if (online || !basic.uuid) {
+      setOfflineTraffic(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    call<{ uuid: string; hours: number }, any>("common:getRecords", {
+      uuid: basic.uuid,
+      hours: 720,
+    })
+      .then((result) => {
+        if (!active) return;
+        const records = result?.records?.[basic.uuid] || [];
+        const latest = records
+          .filter((record: any) => Number.isFinite(new Date(record.time).getTime()))
+          .sort((left: any, right: any) =>
+            new Date(left.time).getTime() - new Date(right.time).getTime()
+          )
+          .at(-1);
+        setOfflineTraffic(latest
+          ? {
+              totalUp: latest.net_total_up || 0,
+              totalDown: latest.net_total_down || 0,
+            }
+          : null);
+      })
+      .catch(() => {
+        if (active) setOfflineTraffic(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [basic.uuid, call, online]);
 
   const defaultLive = {
     cpu: { usage: 0 },
@@ -274,7 +286,12 @@ const Node = ({ basic, live, online, pingStatsEnabled = false }: NodeProps) => {
     swap: { used: 0 },
     load: { load1: 0, load5: 0, load15: 0 },
     disk: { used: 0 },
-    network: { up: 0, down: 0, totalUp: 0, totalDown: 0 },
+    network: {
+      up: 0,
+      down: 0,
+      totalUp: offlineTraffic?.totalUp || 0,
+      totalDown: offlineTraffic?.totalDown || 0,
+    },
     connections: { tcp: 0, udp: 0 },
     uptime: 0,
     process: 0,
@@ -283,6 +300,7 @@ const Node = ({ basic, live, online, pingStatsEnabled = false }: NodeProps) => {
   } as Record;
 
   const liveData = live || defaultLive;
+  const ipCapabilities = resolveZincIpCapabilities(basic.uuid, basic.ipv4, basic.ipv6);
 
   // Calculate percentages
   const memoryUsagePercent = basic.mem_total
@@ -572,21 +590,19 @@ const Node = ({ basic, live, online, pingStatsEnabled = false }: NodeProps) => {
 
                 <Separator className="opacity-30" />
 
-                {/* ── 延迟/丢包行，依 cardDesign 切换 ── */}
+                {/* ── 最低/平均延迟行，依 cardDesign 切换 ── */}
                 {themeConfig.cardDesign === "quality-bars" ? (
                   <div className="grid grid-cols-2 gap-2">
                     <PingHistoryStrip
-                      label={t("nodeCard.ping", { defaultValue: "延迟" })}
+                      label={t("nodeCard.minimumLatency", { defaultValue: "最低延迟" })}
                       value={pingStats.hasData ? `${Math.round(pingStats.avgLatency)} ms` : "-- ms"}
-                      points={pingStats.hasData && pingStats.history.length > 0 ? pingStats.history : PING_HISTORY_PLACEHOLDER_POINTS}
-                      metric="latency"
+                      points={pingStats.hasData && pingStats.latencyHistory.length > 0 ? pingStats.latencyHistory : PING_HISTORY_PLACEHOLDER_POINTS}
                       isLoaded={pingStats.isLoaded}
                     />
                     <PingHistoryStrip
-                      label={t("chart.lossRate", { defaultValue: "丢包" })}
-                      value={pingStats.hasData ? `${pingStats.avgLoss.toFixed(1)}%` : "--%"}
-                      points={pingStats.hasData && pingStats.history.length > 0 ? pingStats.history : PING_HISTORY_PLACEHOLDER_POINTS}
-                      metric="loss"
+                      label={t("nodeCard.averageLatency", { defaultValue: "平均延迟" })}
+                      value={pingStats.hasData ? `${Math.round(pingStats.avgLoss)} ms` : "-- ms"}
+                      points={pingStats.hasData && pingStats.averageLatencyHistory.length > 0 ? pingStats.averageLatencyHistory : PING_HISTORY_PLACEHOLDER_POINTS}
                       isLoaded={pingStats.isLoaded}
                     />
                   </div>
@@ -595,7 +611,8 @@ const Node = ({ basic, live, online, pingStatsEnabled = false }: NodeProps) => {
                     <span className="text-muted-foreground text-xs">{t("nodeCard.pingStats")}</span>
                     {pingStats.hasData ? (
                       <div className="flex gap-3 font-mono text-xs text-muted-foreground">
-                        <span>{pingStats.avgLoss.toFixed(1)}% {t("chart.lossRate")}</span>
+                        <span>{Math.round(pingStats.avgLatency)} ms {t("nodeCard.minimumLatency", { defaultValue: "最低延迟" })}</span>
+                        <span>{Math.round(pingStats.avgLoss)} ms {t("nodeCard.averageLatency", { defaultValue: "平均延迟" })}</span>
                         <span>{pingStats.avgVolatility.toFixed(1)} {t("chart.volatility")}</span>
                       </div>
                     ) : !pingStats.isLoaded ? (
@@ -703,23 +720,23 @@ const Node = ({ basic, live, online, pingStatsEnabled = false }: NodeProps) => {
             </div>
           )}
 
-          {/* Traffic Limit Progress (if exists) */}
-          {basic.traffic_limit > 0 && (
+          {/* Traffic Limit Progress */}
+          {(
             <div className="mt-2 pt-1">
                <div className="flex justify-between text-[10px] mb-1 text-muted-foreground">
                  <span>{trafficLimitType.toUpperCase()} Limit</span>
                  <span className="font-mono">
-                   {formatBytes(trafficUsed)} / {formatBytes(basic.traffic_limit)}
+                   {formatBytes(trafficUsed)} / {basic.traffic_limit > 0 ? formatBytes(basic.traffic_limit) : "∞"}
                  </span>
                </div>
                <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
                  <div 
                    className="h-full bg-primary/70 rounded-full transition-transform duration-500 origin-left"
-                   style={{ transform: `scaleX(${Math.min(trafficPercentage, 100) / 100})` }}
+                   style={{ transform: `scaleX(${basic.traffic_limit > 0 ? Math.min(trafficPercentage, 100) / 100 : 0})` }}
                  />
                </div>
                <div className="mt-1 flex justify-end text-[10px] font-mono text-muted-foreground">
-                 <span>{formatTrafficPercentage(trafficPercentage)}</span>
+                 <span>{basic.traffic_limit > 0 ? formatTrafficPercentage(trafficPercentage) : "∞"}</span>
                </div>
             </div>
           )}
@@ -743,7 +760,7 @@ const Node = ({ basic, live, online, pingStatsEnabled = false }: NodeProps) => {
           </CardFooter>
         )
       ) : (
-        ((showPrice && basic.price) || (showExpiredAt && basic.price) || basic.ipv4 || basic.ipv6 || basic.tags) && (
+        ((showPrice && basic.price) || (showExpiredAt && basic.price) || ipCapabilities.ipv4 || ipCapabilities.ipv6 || basic.tags) && (
           <CardFooter className={footerStyles[themeConfig.cardLayout] || footerStyles.classic}>
              <PriceTags
                 hidden={false}
@@ -752,8 +769,8 @@ const Node = ({ basic, live, online, pingStatsEnabled = false }: NodeProps) => {
                 expired_at={basic.expired_at}
                 currency={basic.currency}
                 tags={basic.tags}
-                ip4={basic.ipv4}
-                ip6={basic.ipv6}
+                ip4={ipCapabilities.ipv4}
+                ip6={ipCapabilities.ipv6}
                 showPrice={showPrice}
                 showExpiredAt={showExpiredAt}
              />
@@ -773,272 +790,42 @@ type NodeGridProps = {
   liveData: LiveData;
 };
 
-type QueuedPingStatsRow = {
-  rowIndex: number;
-  uuids: string[];
-};
-
 const NODE_GRID_MIN_COLUMN_WIDTH = 320;
-const NODE_GRID_GAP = 24;
-const PING_STATS_ROW_LOAD_DELAY_MS = 400;
-const PING_STATS_ROW_ROOT_MARGIN = "360px 0px";
 
 export const NodeGrid = ({ nodes, liveData }: NodeGridProps) => {
-  const gridRef = React.useRef<HTMLDivElement | null>(null);
-  const [columns, setColumns] = React.useState(1);
   const { themeConfig } = useTheme();
   const isCompact = themeConfig.cardLayout === 'compact';
   const NODE_GRID_MIN_COL = isCompact ? 320 : NODE_GRID_MIN_COLUMN_WIDTH;
-  const [pingStatsActiveNodes, setPingStatsActiveNodes] = React.useState<Set<string>>(
-    () => new Set()
-  );
-  const pingStatsActiveNodesRef = React.useRef(pingStatsActiveNodes);
-  const rowUuidsByIndexRef = React.useRef<string[][]>([]);
-  const activeRowItemsRef = React.useRef<Map<number, Set<string>>>(new Map());
-  const queuedRowsRef = React.useRef<QueuedPingStatsRow[]>([]);
-  const queuedRowKeysRef = React.useRef<Set<string>>(new Set());
-  const rowLoadTimerRef = React.useRef<number | null>(null);
-  const processNextRowRef = React.useRef<() => void>(() => {});
-
-  React.useEffect(() => {
-    pingStatsActiveNodesRef.current = pingStatsActiveNodes;
-  }, [pingStatsActiveNodes]);
-
-  React.useEffect(() => {
-    processNextRowRef.current = () => {
-      if (rowLoadTimerRef.current !== null) return;
-
-      const queuedRow = queuedRowsRef.current.shift();
-      if (!queuedRow) return;
-
-      const rowKey = String(queuedRow.rowIndex);
-      queuedRowKeysRef.current.delete(rowKey);
-      const rowIsActive = (activeRowItemsRef.current.get(queuedRow.rowIndex)?.size || 0) > 0;
-      const pendingUuids = rowIsActive
-        ? queuedRow.uuids.filter((uuid) => !pingStatsActiveNodesRef.current.has(uuid))
-        : [];
-
-      if (pendingUuids.length > 0) {
-        setPingStatsActiveNodes((previous) => {
-          const next = new Set(previous);
-          pendingUuids.forEach((uuid) => next.add(uuid));
-          pingStatsActiveNodesRef.current = next;
-          return next;
-        });
-      }
-
-      rowLoadTimerRef.current = window.setTimeout(() => {
-        rowLoadTimerRef.current = null;
-        processNextRowRef.current();
-      }, PING_STATS_ROW_LOAD_DELAY_MS);
-    };
-
-    return () => {
-      if (rowLoadTimerRef.current !== null) {
-        window.clearTimeout(rowLoadTimerRef.current);
-        rowLoadTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  const deactivatePingStatsRow = React.useCallback((rowIndex: number) => {
-    const rowUuids = rowUuidsByIndexRef.current[rowIndex] || [];
-    const rowKey = String(rowIndex);
-    queuedRowKeysRef.current.delete(rowKey);
-    queuedRowsRef.current = queuedRowsRef.current.filter(
-      (queuedRow) => queuedRow.rowIndex !== rowIndex
-    );
-
-    if (rowUuids.length === 0) return;
-
-    setPingStatsActiveNodes((previous) => {
-      const next = new Set(previous);
-      let changed = false;
-      rowUuids.forEach((uuid) => {
-        if (next.delete(uuid)) {
-          changed = true;
-        }
-      });
-
-      if (!changed) return previous;
-      pingStatsActiveNodesRef.current = next;
-      return next;
-    });
-  }, []);
-
-  const enqueuePingStatsRow = React.useCallback((rowIndex: number, rowUuids: string[]) => {
-    if (rowUuids.length === 0) return;
-    if ((activeRowItemsRef.current.get(rowIndex)?.size || 0) === 0) return;
-
-    const pendingUuids = rowUuids.filter(
-      (uuid) => !pingStatsActiveNodesRef.current.has(uuid)
-    );
-    if (pendingUuids.length === 0) return;
-
-    const rowKey = String(rowIndex);
-    if (queuedRowKeysRef.current.has(rowKey)) return;
-
-    queuedRowKeysRef.current.add(rowKey);
-    queuedRowsRef.current.push({ rowIndex, uuids: rowUuids });
-    processNextRowRef.current();
-  }, []);
-
-  const markPingStatsRowItem = React.useCallback((
-    rowIndex: number,
-    uuid: string,
-    isActive: boolean
-  ) => {
-    const activeRows = activeRowItemsRef.current;
-    const rowItems = activeRows.get(rowIndex) || new Set<string>();
-
-    if (isActive) {
-      rowItems.add(uuid);
-      activeRows.set(rowIndex, rowItems);
-      enqueuePingStatsRow(rowIndex, rowUuidsByIndexRef.current[rowIndex] || []);
-      return;
-    }
-
-    rowItems.delete(uuid);
-    if (rowItems.size > 0) {
-      activeRows.set(rowIndex, rowItems);
-      return;
-    }
-
-    activeRows.delete(rowIndex);
-    deactivatePingStatsRow(rowIndex);
-  }, [deactivatePingStatsRow, enqueuePingStatsRow]);
-
-  React.useEffect(() => {
-    const grid = gridRef.current;
-    if (!grid) return;
-
-    const updateColumns = () => {
-      const computedStyle = window.getComputedStyle(grid);
-      const columnGap = Number.parseFloat(computedStyle.columnGap) || NODE_GRID_GAP;
-      const nextColumns = Math.max(
-        1,
-        Math.floor((grid.clientWidth + columnGap) / (NODE_GRID_MIN_COL + columnGap))
-      );
-      setColumns((previous) => (previous === nextColumns ? previous : nextColumns));
-    };
-
-    updateColumns();
-
-    if (typeof ResizeObserver === "undefined") {
-      window.addEventListener("resize", updateColumns);
-      return () => window.removeEventListener("resize", updateColumns);
-    }
-
-    const resizeObserver = new ResizeObserver(updateColumns);
-    resizeObserver.observe(grid);
-
-    return () => resizeObserver.disconnect();
-  }, []);
 
   const onlineNodes = React.useMemo(() => liveData?.online ?? [], [liveData?.online]);
 
   const sortedNodes = React.useMemo(() => {
     return [...nodes].sort((a, b) => {
-      const aOnline = onlineNodes.includes(a.uuid);
-      const bOnline = onlineNodes.includes(b.uuid);
-
-      if (aOnline !== bOnline) {
-        return aOnline ? -1 : 1;
-      }
-
-      return a.weight - b.weight;
+      return (a.weight ?? 0) - (b.weight ?? 0) || a.name.localeCompare(b.name);
     });
-  }, [nodes, onlineNodes]);
-
-  const rowUuidsByIndex = React.useMemo(() => {
-    const rows: string[][] = [];
-    sortedNodes.forEach((node, index) => {
-      const rowIndex = Math.floor(index / columns);
-      if (!rows[rowIndex]) rows[rowIndex] = [];
-      rows[rowIndex].push(node.uuid);
-    });
-    return rows;
-  }, [sortedNodes, columns]);
-
-  React.useEffect(() => {
-    rowUuidsByIndexRef.current = rowUuidsByIndex;
-  }, [rowUuidsByIndex]);
-
-  React.useEffect(() => {
-    const grid = gridRef.current;
-    if (!grid) return;
-
-    const gridItems = Array.from(
-      grid.querySelectorAll<HTMLElement>("[data-node-grid-item='true']")
-    );
-
-    if (typeof IntersectionObserver === "undefined") {
-      const firstRowUuids = rowUuidsByIndex[0] || [];
-      activeRowItemsRef.current.set(0, new Set(firstRowUuids));
-      enqueuePingStatsRow(0, firstRowUuids);
-
-      return () => {
-        activeRowItemsRef.current.delete(0);
-        deactivatePingStatsRow(0);
-      };
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const item = entry.target as HTMLElement;
-          const rowIndex = Number(item.dataset.rowIndex);
-          const uuid = item.dataset.nodeUuid;
-          if (!uuid) return;
-          if (!Number.isFinite(rowIndex)) return;
-          markPingStatsRowItem(rowIndex, uuid, entry.isIntersecting);
-        });
-      },
-      {
-        root: null,
-        rootMargin: PING_STATS_ROW_ROOT_MARGIN,
-        threshold: 0.01,
-      }
-    );
-
-    gridItems.forEach((item) => observer.observe(item));
-
-    return () => {
-      observer.disconnect();
-      activeRowItemsRef.current.forEach((_rowItems, rowIndex) => {
-        deactivatePingStatsRow(rowIndex);
-      });
-      activeRowItemsRef.current.clear();
-    };
-  }, [deactivatePingStatsRow, enqueuePingStatsRow, markPingStatsRowItem, rowUuidsByIndex]);
+  }, [nodes]);
 
   return (
     <div
-      ref={gridRef}
       className="grid gap-6 py-4 box-border w-full"
       style={{
         gridTemplateColumns: `repeat(auto-fill, minmax(${NODE_GRID_MIN_COL}px, 1fr))`,
       }}
     >
-      {sortedNodes.map((node, index) => {
+      {sortedNodes.map((node) => {
         const isOnline = onlineNodes.includes(node.uuid);
         const nodeData =
           liveData && liveData.data ? liveData.data[node.uuid] : undefined;
-        const rowIndex = Math.floor(index / columns);
-
         return (
           <div
             key={node.uuid}
-            data-node-grid-item="true"
-            data-row-index={rowIndex}
-            data-node-uuid={node.uuid}
             className="flex min-w-0"
           >
             <Node
               basic={node}
               live={nodeData}
               online={isOnline}
-              pingStatsEnabled={pingStatsActiveNodes.has(node.uuid)}
+              pingStatsEnabled
             />
           </div>
         );

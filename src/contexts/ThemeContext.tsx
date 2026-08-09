@@ -172,8 +172,8 @@ export const DEFAULT_STATUS_CARDS_VISIBILITY: StatusCardsVisibility = {
 };
 
 export const DEFAULT_GUEST_DISPLAY_SETTINGS: GuestDisplaySettings = {
-  showPrice: false,
-  showExpiredAt: false,
+  showPrice: true,
+  showExpiredAt: true,
 };
 
 export const DEFAULT_NODE_VIEW_MODE: NodeViewMode = "grid";

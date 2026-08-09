@@ -408,6 +408,8 @@
     "os": "操作系统",
     "ping": "延迟",
     "pingStats": "延迟统计（24h）",
+    "minimumLatency": "最低延迟",
+    "averageLatency": "平均延迟",
     "price": "价格",
     "ram": "内存",
     "resourceUsage": "资源使用",

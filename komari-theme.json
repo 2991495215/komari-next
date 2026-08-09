@@ -211,13 +211,13 @@
                 "key": "guestDisplay.showPrice",
                 "type": "bool",
                 "label": "Show prices to guests",
-                "default": false
+                "default": true
             },
             {
                 "key": "guestDisplay.showExpiredAt",
                 "type": "bool",
                 "label": "Show expiration to guests",
-                "default": false
+                "default": true
             }
         ],
         "fields": [
@@ -489,7 +489,7 @@
                     "zh-TW": "開啟後，未登入訪客可以看到節點價格。",
                     "en-US": "When enabled, visitors can see node prices."
                 },
-                "default": false
+                "default": true
             },
             {
                 "key": "guestDisplay.showExpiredAt",
@@ -504,7 +504,7 @@
                     "zh-TW": "開啟後，未登入訪客可以看到節點到期狀態。",
                     "en-US": "When enabled, visitors can see node expiration status."
                 },
-                "default": false
+                "default": true
             }
         ],
         "options": [
@@ -772,7 +772,7 @@
                     "zh-TW": "開啟後，未登入訪客可以看到節點價格。",
                     "en-US": "When enabled, visitors can see node prices."
                 },
-                "default": false
+                "default": true
             },
             {
                 "key": "guestDisplay.showExpiredAt",
@@ -787,7 +787,7 @@
                     "zh-TW": "開啟後，未登入訪客可以看到節點到期狀態。",
                     "en-US": "When enabled, visitors can see node expiration status."
                 },
-                "default": false
+                "default": true
             }
         ],
         "items": [
@@ -1059,7 +1059,7 @@
                     "zh-TW": "開啟後，未登入訪客可以看到節點價格。",
                     "en-US": "When enabled, visitors can see node prices."
                 },
-                "default": false
+                "default": true
             },
             {
                 "key": "guestDisplay.showExpiredAt",
@@ -1074,7 +1074,7 @@
                     "zh-TW": "開啟後，未登入訪客可以看到節點到期狀態。",
                     "en-US": "When enabled, visitors can see node expiration status."
                 },
-                "default": false
+                "default": true
             }
         ],
         "data": [
@@ -1346,7 +1346,7 @@
                     "zh-TW": "開啟後，未登入訪客可以看到節點價格。",
                     "en-US": "When enabled, visitors can see node prices."
                 },
-                "default": false
+                "default": true
             },
             {
                 "key": "guestDisplay.showExpiredAt",
@@ -1361,7 +1361,7 @@
                     "zh-TW": "開啟後，未登入訪客可以看到節點到期狀態。",
                     "en-US": "When enabled, visitors can see node expiration status."
                 },
-                "default": false
+                "default": true
             }
         ]
     }

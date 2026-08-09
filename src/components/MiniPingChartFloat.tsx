@@ -49,8 +49,6 @@ const MiniPingChartFloat: React.FC<FloatMiniPingChartProps> = ({
     setOpen((prev) => !prev);
   }, []);
 
-  const responsiveWidth = typeof chartWidth === 'number' ? `${chartWidth}px` : chartWidth;
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -68,14 +66,17 @@ const MiniPingChartFloat: React.FC<FloatMiniPingChartProps> = ({
         sideOffset={5}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="z-50 mx-auto w-auto max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-lg border bg-card p-2 shadow-lg touch-pan-y"
+        className="z-50 mx-auto w-[min(900px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] overflow-x-auto overflow-y-auto overscroll-contain rounded-lg border bg-card p-2 shadow-lg touch-pan-y"
         style={{
-          width: responsiveWidth,
-          maxHeight: "min(var(--radix-popover-content-available-height, calc(100dvh - 1rem)), calc(100dvh - 1rem))",
+          width: "min(900px, calc(100vw - 2rem))",
+          maxWidth: "calc(100vw - 2rem)",
+          maxHeight: "min(var(--radix-popover-content-available-height, calc(100dvh - 2rem)), calc(100dvh - 2rem))",
         }}
         align="center"
       >
-        <MiniPingChart hours={hours} uuid={uuid} width="100%" height={chartHeight} />
+        <div style={{ minWidth: typeof chartWidth === "number" ? `${Math.min(chartWidth, 560)}px` : 560 }}>
+          <MiniPingChart hours={hours} uuid={uuid} width="100%" height={chartHeight} />
+        </div>
       </PopoverContent>
     </Popover>
   );
