@@ -1,6 +1,5 @@
 import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
-import LanguageDetector from "i18next-browser-languagedetector";
 import en from "./locales/en.json";
 import zh_CN from "./locales/zh_CN.json";
 import zh_TW from "./locales/zh_TW.json";
@@ -110,7 +109,6 @@ export function detectClientLanguage(): string {
 }
 
 i18next
-  .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources,
