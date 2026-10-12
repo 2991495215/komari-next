@@ -37,7 +37,9 @@ if (process.argv.includes('--live')) {
 paths=json.loads(${JSON.stringify(JSON.stringify(Object.keys(expected)))})
 print(json.dumps({p:hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in paths}))
 `;
-  const actual = JSON.parse(execFileSync('ssh', ['-o', 'BatchMode=yes', 's3', 'python3', '-'], { input: python, encoding: 'utf8', timeout: 30000 }));
+  const actual = process.argv.includes('--local-deployment')
+    ? Object.fromEntries(Object.keys(expected).map(path => [path, sha256(readFileSync(path))]))
+    : JSON.parse(execFileSync('ssh', ['-o', 'BatchMode=yes', 's3', 'python3', '-'], { input: python, encoding: 'utf8', timeout: 30000 }));
   assert.deepEqual(actual, expected);
   const page = await fetch('https://k.zinc.run/', { signal: AbortSignal.timeout(15000) });
   assert.equal(page.status, 200);

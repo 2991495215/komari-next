@@ -1,0 +1,16 @@
+FROM node:22-alpine AS frontend
+ADD https://codeload.github.com/komari-monitor/komari-web/tar.gz/refs/tags/1.5.0-fix1 /frontend.tar.gz
+RUN mkdir /src && tar -xzf /frontend.tar.gz -C /src --strip-components=1
+WORKDIR /src
+RUN npm ci && npm run build
+FROM golang:1.25.7-alpine AS backend
+RUN apk add --no-cache gcc musl-dev zstd
+ADD https://codeload.github.com/komari-monitor/komari/tar.gz/f0cc0fba38ce161935372633cae5248c934e2b23 /backend.tar.gz
+RUN mkdir /src && tar -xzf /backend.tar.gz -C /src --strip-components=1
+WORKDIR /src
+COPY --from=frontend /src/dist/ /frontend/
+COPY --from=frontend /src/komari-theme.json /src/web/public/defaultTheme/komari-theme.json
+RUN tar -cf /frontend.tar -C /frontend . && zstd -19 -q /frontend.tar -o web/public/defaultTheme/dist.tar.zst
+RUN GOMAXPROCS=2 go build -p 2 -trimpath -ldflags='-s -w -linkmode external -extldflags -static -X github.com/komari-monitor/komari/utils.CurrentVersion=1.5.1 -X github.com/komari-monitor/komari/utils.VersionHash=f0cc0fba38ce161935372633cae5248c934e2b23' -o /komari .
+FROM ghcr.io/komari-monitor/komari:1.5.1
+COPY --from=backend /komari /app/komari
